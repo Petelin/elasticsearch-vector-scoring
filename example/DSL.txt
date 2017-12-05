@@ -1,0 +1,84 @@
+PUT test_vs
+{
+    "settings" : {
+        "analysis": {
+                "analyzer": {
+                   "payload_analyzer": {
+                      "type": "custom",
+                      "tokenizer":"whitespace",
+                      "filter":"delimited_payload_filter"
+                    }
+          }
+        }
+     }
+}
+
+
+
+PUT test_vs/_mapping/movies
+{
+    "movies" : {
+        "properties" : {
+            "model_factor": {
+                            "type": "text",
+                            "term_vector": "with_positions_offsets_payloads",
+                            "analyzer" : "payload_analyzer"
+                     }
+        }
+    }
+}
+
+
+PUT test_vs/movies/1
+{
+    "model_factor":"0|1.2 1|0.1 2|0.4 3|-0.2 4|0.3",
+    "name": "Test 1"
+}
+
+PUT test_vs/movies/2
+{
+    "model_factor":"0|0.1 1|2.3 2|-1.6 3|0.7 4|-1.3",
+    "name": "Test 2"
+}
+
+
+PUT test_vs/movies/3
+{
+    "model_factor":"0|-0.5 1|1.6 2|1.1 3|0.9 4|0.7",
+    "name": "Test 3"
+}
+
+
+GET test_vs/movies/1/_termvector
+{
+  "fields" : ["model_factor"],
+  "payloads" : true,
+  "positions" : true
+}
+
+
+
+POST test_vs/movies/_search?pretty
+{
+    "query": {
+        "function_score": {
+            "query" : {
+                "query_string": {
+                    "query": "*"
+                }
+            },
+            "script_score": {
+                "script": {
+                  "source": "payload_vector_score",
+                  "lang": "native",
+                  "params": {
+                      "field": "model_factor",
+                      "vector": [0.1,2.3,-1.6,0.7,-1.3],
+                      "cosine" : true
+                    }
+        }
+            },
+            "boost_mode": "replace"
+        }
+    }
+}
